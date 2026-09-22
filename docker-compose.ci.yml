@@ -1,0 +1,9 @@
+services:
+  auth:
+    ports: !reset []
+  catalogo:
+    ports: !reset []
+  pedidos:
+    ports: !reset []
+  pagos:
+    ports: !reset []

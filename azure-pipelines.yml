@@ -1,0 +1,28 @@
+trigger:
+  - main
+pool:
+  name: Default
+  demands:
+    - Agent.Name -equals rikeli-local
+steps:
+  - checkout: self
+  - powershell: |
+      $env:POSTGRES_DB = "rikeli_ci"
+      $env:POSTGRES_USER = "rikeli_ci"
+      $env:POSTGRES_PASSWORD = [guid]::NewGuid().ToString("N")
+      try {
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml -p rikeli-ci up -d --build --wait --wait-timeout 240
+        if ($LASTEXITCODE -ne 0) { throw "Fallo al construir o iniciar servicios" }
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml -p rikeli-ci run --rm tests
+        if ($LASTEXITCODE -ne 0) { throw "Las pruebas fallaron" }
+      } finally {
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml -p rikeli-ci down -v
+      }
+    displayName: Construir contenedores y comprobar servicios
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'test-results/smoke.xml'
+      failTaskOnFailedTests: true
+      failTaskOnMissingResultsFile: true

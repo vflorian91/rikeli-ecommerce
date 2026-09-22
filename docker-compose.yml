@@ -1,0 +1,118 @@
+name: rikeli
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rikeli}
+      POSTGRES_USER: ${POSTGRES_USER:-rikeli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  auth:
+    build:
+      context: .
+      dockerfile: docker/auth/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rikeli}
+      POSTGRES_USER: ${POSTGRES_USER:-rikeli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+  catalogo:
+    build:
+      context: .
+      dockerfile: docker/catalogo/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rikeli}
+      POSTGRES_USER: ${POSTGRES_USER:-rikeli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+  pedidos:
+    build:
+      context: .
+      dockerfile: docker/pedidos/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rikeli}
+      POSTGRES_USER: ${POSTGRES_USER:-rikeli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+  pagos:
+    build:
+      context: .
+      dockerfile: docker/pagos/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rikeli}
+      POSTGRES_USER: ${POSTGRES_USER:-rikeli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+  tests:
+    profiles: ["test"]
+    # Reutiliza la imagen de auth construida para este proyecto (local o CI).
+    image: ${COMPOSE_PROJECT_NAME:-rikeli}-auth
+    pull_policy: never
+    working_dir: /tests
+    volumes:
+      - ./tests:/tests:ro
+      - ./test-results:/results
+    command: ["python", "smoke.py"]
+volumes:
+  postgres_data:
