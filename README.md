@@ -61,3 +61,5 @@ Solo acceso local. PostgreSQL y Redis no publican puertos al equipo.
 La base es nueva; el script del entregable 8 aun no esta incorporado.
 El entorno de CI es desechable y elimina exclusivamente sus propios volumenes.
 CI utiliza docker-compose.ci.yml para evitar publicar puertos y no interferir con el entorno local.
+
+El repositorio también está disponible en Azure Repos, dentro del proyecto Rikeli-Seminario.
