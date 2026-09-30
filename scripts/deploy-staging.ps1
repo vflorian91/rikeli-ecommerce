@@ -1,9 +1,9 @@
-param([Parameter(Mandatory=$true)][string]$ImagePrefix)
+param([Parameter(Mandatory=$true)][string]$ImagePrefix, [string]$SecretDirectory = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Rikeli\staging'))
 $ErrorActionPreference = 'Stop'
 $env:STAGING_IMAGE_PREFIX = $ImagePrefix
 $env:POSTGRES_DB = 'rikeli_staging'
 $env:POSTGRES_USER = 'rikeli_staging'
-$secretDirectory = Join-Path $env:LOCALAPPDATA 'Rikeli\staging'
+
 $secretFile = Join-Path $secretDirectory 'postgres.credential.xml'
 if (!(Test-Path $secretFile)) {
     $existingVolume = docker volume ls --filter name=rikeli-staging_postgres_data --format '{{.Name}}'
@@ -43,3 +43,4 @@ catch {
 finally {
     Remove-Item Env:POSTGRES_PASSWORD -ErrorAction SilentlyContinue
 }
+
