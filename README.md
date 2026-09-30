@@ -71,7 +71,8 @@ Proyecto Docker: rikeli-staging; volumen independiente y persistente.
 Endpoints: http://localhost:8101/docs (auth), 8102 (catalogo), 8103 (pedidos), 8104 (pagos).
 Cada servicio expone /health; la evidencia se publica como evidencia-staging.
 La credencial PostgreSQL se conserva cifrada por Windows DPAPI en
-%LOCALAPPDATA%\Rikeli\staging\postgres.credential.xml, bajo el usuario del agente.
+C:\agents\rikeli\staging\postgres.credential.xml, bajo el usuario del agente.
+La ejecucion manual usa por defecto %LOCALAPPDATA%\Rikeli\staging; Azure pasa la ruta persistente explicitamente.
 No eliminar esa credencial ni el volumen para actualizar. No usar down -v en staging.
 El despliegue requiere Docker Desktop encendido y el mismo usuario Windows del agente.
 El entorno es local: no es un sitio publico ni incluye aun las funciones comerciales.
