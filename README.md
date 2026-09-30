@@ -63,3 +63,15 @@ El entorno de CI es desechable y elimina exclusivamente sus propios volumenes.
 CI utiliza docker-compose.ci.yml para evitar publicar puertos y no interferir con el entorno local.
 
 El repositorio también está disponible en Azure Repos, dentro del proyecto Rikeli-Seminario.
+## Staging local
+
+Azure Pipelines ejecuta CI y, solo si pasa en main, Deploy staging en rikeli-local.
+Staging usa las mismas imagenes comprobadas por pytest, sin reconstruirlas.
+Proyecto Docker: rikeli-staging; volumen independiente y persistente.
+Endpoints: http://localhost:8101/docs (auth), 8102 (catalogo), 8103 (pedidos), 8104 (pagos).
+Cada servicio expone /health; la evidencia se publica como evidencia-staging.
+La credencial PostgreSQL se conserva cifrada por Windows DPAPI en
+%LOCALAPPDATA%\Rikeli\staging\postgres.credential.xml, bajo el usuario del agente.
+No eliminar esa credencial ni el volumen para actualizar. No usar down -v en staging.
+El despliegue requiere Docker Desktop encendido y el mismo usuario Windows del agente.
+El entorno es local: no es un sitio publico ni incluye aun las funciones comerciales.

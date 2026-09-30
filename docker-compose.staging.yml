@@ -1,0 +1,25 @@
+services:
+  postgres:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+  auth:
+    image: ${STAGING_IMAGE_PREFIX:?Define STAGING_IMAGE_PREFIX}-auth
+    pull_policy: never
+    restart: unless-stopped
+    ports: !override ["127.0.0.1:8101:8000"]
+  catalogo:
+    image: ${STAGING_IMAGE_PREFIX:?Define STAGING_IMAGE_PREFIX}-catalogo
+    pull_policy: never
+    restart: unless-stopped
+    ports: !override ["127.0.0.1:8102:8000"]
+  pedidos:
+    image: ${STAGING_IMAGE_PREFIX:?Define STAGING_IMAGE_PREFIX}-pedidos
+    pull_policy: never
+    restart: unless-stopped
+    ports: !override ["127.0.0.1:8103:8000"]
+  pagos:
+    image: ${STAGING_IMAGE_PREFIX:?Define STAGING_IMAGE_PREFIX}-pagos
+    pull_policy: never
+    restart: unless-stopped
+    ports: !override ["127.0.0.1:8104:8000"]

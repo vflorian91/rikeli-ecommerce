@@ -6,64 +6,94 @@ pool:
   demands:
     - Agent.Name -equals rikeli-local
 
-steps:
-  - checkout: self
+stages:
+  - stage: CI
+    displayName: Checkout, build y test
+    jobs:
+      - job: BuildTest
+        steps:
+          - checkout: self
 
-  - powershell: |
-      $env:POSTGRES_DB = "rikeli_ci"
-      $env:POSTGRES_USER = "rikeli_ci"
-      $env:POSTGRES_PASSWORD = [guid]::NewGuid().ToString("N")
-      # A fresh project prevents reuse of a database initialized with another password.
-      $ciProject = "rikeli-ci-$env:BUILD_BUILDID-$env:SYSTEM_JOBATTEMPT"
-      $env:COMPOSE_PROJECT_NAME = $ciProject
-      $composeArgs = @("compose", "-f", "docker-compose.yml", "-f", "docker-compose.ci.yml", "-p", $ciProject)
-      $results = Join-Path $env:BUILD_SOURCESDIRECTORY "test-results"
-      New-Item -ItemType Directory -Force -Path $results | Out-Null
-      $diagnostics = Join-Path $results "diagnostics"
+          - powershell: |
+              $env:POSTGRES_DB = "rikeli_ci"
+              $env:POSTGRES_USER = "rikeli_ci"
+              $env:POSTGRES_PASSWORD = [guid]::NewGuid().ToString("N")
+              # A fresh project prevents reuse of a database initialized with another password.
+              $ciProject = "rikeli-ci-$env:BUILD_BUILDID-$env:SYSTEM_JOBATTEMPT"
+              $env:COMPOSE_PROJECT_NAME = $ciProject
+              Write-Host "##vso[task.setvariable variable=stagingImagePrefix;isOutput=true]$ciProject"
+              $composeArgs = @("compose", "-f", "docker-compose.yml", "-f", "docker-compose.ci.yml", "-p", $ciProject)
+              $results = Join-Path $env:BUILD_SOURCESDIRECTORY "test-results"
+              New-Item -ItemType Directory -Force -Path $results | Out-Null
+              $diagnostics = Join-Path $results "diagnostics"
 
-      try {
-        docker @composeArgs up -d --build --wait --wait-timeout 240
-        if ($LASTEXITCODE -ne 0) { throw "Fallo al construir o iniciar servicios" }
+              try {
+                docker @composeArgs up -d --build --wait --wait-timeout 240
+                if ($LASTEXITCODE -ne 0) { throw "Fallo al construir o iniciar servicios" }
 
-        docker @composeArgs run --rm tests
-        if ($LASTEXITCODE -ne 0) { throw "Las pruebas pytest fallaron" }
-      }
-      catch {
-        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
-        docker @composeArgs ps -a 2>&1 | Out-File (Join-Path $diagnostics "containers.txt")
-        docker @composeArgs logs --no-color --tail 200 2>&1 | Out-File (Join-Path $diagnostics "services.log")
-        $containerIds = @(docker @composeArgs ps -a -q)
-        foreach ($containerId in $containerIds) {
-          # Read only health details, avoiding environment variables and credentials.
-          docker inspect --format '{{json .State.Health}}' $containerId 2>&1 | Out-File (Join-Path $diagnostics "$containerId-health.json")
-        }
-        throw
-      }
-      finally {
-        if (Test-Path (Join-Path $results "pytest.xml")) {
-          Write-Host "##vso[task.setvariable variable=pytestResultsExist]true"
-        }
-        if (Test-Path $results) {
-          Write-Host "##vso[task.setvariable variable=testArtifactsExist]true"
-        }
-        docker @composeArgs down -v
-        if ($LASTEXITCODE -ne 0) { throw "Fallo al limpiar los recursos de CI" }
-      }
-    displayName: Build y ejecutar pruebas pytest
+                docker @composeArgs run --rm tests
+                if ($LASTEXITCODE -ne 0) { throw "Las pruebas pytest fallaron" }
+              }
+              catch {
+                New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+                docker @composeArgs ps -a 2>&1 | Out-File (Join-Path $diagnostics "containers.txt")
+                docker @composeArgs logs --no-color --tail 200 2>&1 | Out-File (Join-Path $diagnostics "services.log")
+                $containerIds = @(docker @composeArgs ps -a -q)
+                foreach ($containerId in $containerIds) {
+                  # Read only health details, avoiding environment variables and credentials.
+                  docker inspect --format '{{json .State.Health}}' $containerId 2>&1 | Out-File (Join-Path $diagnostics "$containerId-health.json")
+                }
+                throw
+              }
+              finally {
+                if (Test-Path (Join-Path $results "pytest.xml")) {
+                  Write-Host "##vso[task.setvariable variable=pytestResultsExist]true"
+                }
+                if (Test-Path $results) {
+                  Write-Host "##vso[task.setvariable variable=testArtifactsExist]true"
+                }
+                docker @composeArgs down -v
+                if ($LASTEXITCODE -ne 0) { throw "Fallo al limpiar los recursos de CI" }
+              }
+            name: buildTest
+            displayName: Build y ejecutar pruebas pytest
 
-  - task: PublishTestResults@2
-    condition: and(always(), eq(variables['pytestResultsExist'], 'true'))
-    displayName: Publicar resultados pytest
-    inputs:
-      testResultsFormat: JUnit
-      testResultsFiles: 'test-results/pytest.xml'
-      failTaskOnFailedTests: true
-      failTaskOnMissingResultsFile: true
-      testRunTitle: 'Pruebas pytest - Rikeli'
+          - task: PublishTestResults@2
+            condition: and(always(), eq(variables['pytestResultsExist'], 'true'))
+            displayName: Publicar resultados pytest
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'test-results/pytest.xml'
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: true
+              testRunTitle: 'Pruebas pytest - Rikeli'
 
-  - task: PublishPipelineArtifact@1
-    condition: and(always(), eq(variables['testArtifactsExist'], 'true'))
-    displayName: Publicar reporte HTML y diagnosticos
-    inputs:
-      targetPath: '$(Build.SourcesDirectory)/test-results'
-      artifact: 'reportes-pruebas'
+          - task: PublishPipelineArtifact@1
+            condition: and(always(), eq(variables['testArtifactsExist'], 'true'))
+            displayName: Publicar reporte HTML y diagnosticos
+            inputs:
+              targetPath: '$(Build.SourcesDirectory)/test-results'
+              artifact: 'reportes-pruebas'
+
+  - stage: Staging
+    displayName: Deploy staging
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      stagingImagePrefix: $[ stageDependencies.CI.BuildTest.outputs['buildTest.stagingImagePrefix'] ]
+    jobs:
+      - job: DeployStaging
+        displayName: Desplegar y verificar servicios
+        steps:
+          - checkout: self
+          - task: PowerShell@2
+            displayName: Deploy staging y verificar health
+            inputs:
+              filePath: scripts/deploy-staging.ps1
+              arguments: '-ImagePrefix "$(stagingImagePrefix)"'
+          - task: PublishPipelineArtifact@1
+            condition: succeededOrFailed()
+            displayName: Publicar evidencia staging
+            inputs:
+              targetPath: '$(Build.SourcesDirectory)/test-results/staging'
+              artifact: evidencia-staging
