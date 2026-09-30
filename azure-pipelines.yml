@@ -90,10 +90,11 @@ stages:
             displayName: Deploy staging y verificar health
             inputs:
               filePath: scripts/deploy-staging.ps1
-              arguments: '-ImagePrefix "$(stagingImagePrefix)" -SecretDirectory "C:\Users\victo\AppData\Local\Rikeli\staging"'
+              arguments: '-ImagePrefix "$(stagingImagePrefix)" -SecretDirectory "C:\agents\rikeli\staging"'
           - task: PublishPipelineArtifact@1
             condition: succeededOrFailed()
             displayName: Publicar evidencia staging
             inputs:
               targetPath: '$(Build.SourcesDirectory)/test-results/staging'
               artifact: evidencia-staging
+
