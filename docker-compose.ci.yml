@@ -7,3 +7,16 @@ services:
     ports: !reset []
   pagos:
     ports: !reset []
+
+  tests:
+    command:
+      - python
+      - -m
+      - pytest
+      - test_health.py
+      - -v
+      - --junitxml=/results/pytest.xml
+      - --html=/results/reporte-pruebas.html
+      - --self-contained-html
+      - -p
+      - no:cacheprovider
